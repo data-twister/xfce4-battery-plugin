@@ -71,7 +71,7 @@ typedef struct
     gboolean    tooltip_display_percentage;
     gboolean    tooltip_display_time;
     int         low_percentage;
-    int         hidden_indicator_full_amt;
+    int         user_set_full_amount;
     int         critical_percentage;
     int         action_on_low;
     int         action_on_critical;
@@ -115,7 +115,7 @@ typedef struct
     GtkWidget        *cb_disp_tooltip_percentage;
     GtkWidget        *cb_disp_tooltip_time;
     GtkWidget        *cb_disp_icon;
-    GtkWidget        *sb_hidden_indicator_full_amt;
+    GtkWidget        *sb_user_set_full_amount;
     GtkWidget        *sb_low_percentage;
     GtkWidget        *sb_critical_percentage;
     GtkWidget        *co_action_low;
@@ -147,7 +147,7 @@ init_options(t_battmon_options *options)
     options->tooltip_display_percentage = FALSE;
     options->tooltip_display_time = FALSE;
     options->low_percentage = 10;
-    options->hidden_indicator_full_amt = 97;
+    options->user_set_full_amount = 97;
     options->critical_percentage = 5;
     options->action_on_low = 1;
     options->action_on_critical = 1;
@@ -267,7 +267,7 @@ update_apm_status(t_battmon *battmon)
     charge = CLAMP (charge, 0, 100);
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(battmon->battstatus), charge / 100.0);
 
-    if(!(battmon->options.hide_indicator_when_full && charge >= battmon->options.hidden_indicator_full_amt )) {
+    if(!(battmon->options.hide_indicator_when_full && charge >= battmon->options.user_set_full_amount )) {
     if (battmon->options.display_bar) {
         gtk_widget_show(GTK_WIDGET(battmon->battstatus));
     } else {
@@ -296,7 +296,7 @@ update_apm_status(t_battmon *battmon)
             /* battery low */
             icon_name = g_strdup("xfce4-battery-low");
             new_state = BM_LOW;
-        } else if (charge < 99) {
+        } else if (charge < battmon->options.user_set_full_amount) {
             /* battery ok */
             icon_name = g_strdup("xfce4-battery-ok");
             new_state = BM_OK;
@@ -326,7 +326,7 @@ update_apm_status(t_battmon *battmon)
         gtk_widget_hide(battmon->image);
     }
 
-    if (battmon->options.display_percentage && charge > 0 && !(battmon->options.hide_when_full && acline && charge >= 99)) {
+    if (battmon->options.display_percentage && charge > 0 && !(battmon->options.hide_when_full && acline && charge >= battmon->options.user_set_full_amount)) {
         gtk_widget_show(GTK_WIDGET(battmon->charge));
         gtk_widget_show(GTK_WIDGET(battmon->timechargealignment));
         g_snprintf(buffer, sizeof(buffer),"%d%% ", charge);
@@ -335,7 +335,7 @@ update_apm_status(t_battmon *battmon)
         gtk_widget_hide(GTK_WIDGET(battmon->charge));
     }
 
-    if (battmon->options.display_time && time_remaining > 0 && !(battmon->options.hide_when_full && acline && charge >= 99 )) {
+    if (battmon->options.display_time && time_remaining > 0 && !(battmon->options.hide_when_full && acline && charge >= battmon->options.user_set_full_amount )) {
         gtk_widget_show(GTK_WIDGET(battmon->rtime));
         gtk_widget_show(GTK_WIDGET(battmon->timechargealignment));
         g_snprintf(buffer, sizeof(buffer),"%02d:%02d ",time_remaining/60,time_remaining%60);
@@ -345,7 +345,7 @@ update_apm_status(t_battmon *battmon)
         gtk_widget_hide(GTK_WIDGET(battmon->rtime));
     }
 
-    if ((!battmon->options.display_time && !battmon->options.display_percentage) || (battmon->options.hide_when_full && acline && charge >= 99 )) {
+    if ((!battmon->options.display_time && !battmon->options.display_percentage) || (battmon->options.hide_when_full && acline && charge >= battmon->options.user_set_full_amount )) {
         gtk_widget_hide(GTK_WIDGET(battmon->timechargealignment));
     }
 
@@ -355,7 +355,7 @@ update_apm_status(t_battmon *battmon)
         if ((method == BM_USE_ACPI && present == 0) || (method == BM_USE_APM && charge == 0)) {
             t=_("(No battery, AC on-line)");
         } else {
-            t=(charge<99.9)?_("(Charging from AC)"):_("(AC on-line)");
+            t=(charge< battmon->options.user_set_full_amount)?_("(Charging from AC)"):_("(AC on-line)");
         }
 
         if (battmon->options.tooltip_display_percentage) {
@@ -692,7 +692,7 @@ battmon_read_config(XfcePanelPlugin *plugin, t_battmon *battmon)
 
     battmon->options.low_percentage = xfce_rc_read_int_entry (rc, "low_percentage", 10);
 
-    battmon->options.hidden_indicator_full_amt = xfce_rc_read_int_entry (rc, "hidden_indicator_full_amt", 97);
+    battmon->options.user_set_full_amount = xfce_rc_read_int_entry (rc, "user_set_full_amount", 97);
     
     battmon->options.critical_percentage = xfce_rc_read_int_entry (rc, "critical_percentage", 5);
 
@@ -766,7 +766,7 @@ battmon_write_config(XfcePanelPlugin *plugin, t_battmon *battmon)
 
     xfce_rc_write_int_entry (rc, "hide_indicator_when_full", battmon->options.hide_indicator_when_full );
 
-    xfce_rc_write_int_entry (rc, "hidden_indicator_full_amt", battmon->options.hidden_indicator_full_amt );
+    xfce_rc_write_int_entry (rc, "user_set_full_amount", battmon->options.user_set_full_amount );
 
     color_str = gdk_rgba_to_string (&battmon->options.colorA);
     xfce_rc_write_entry (rc, "colorA", color_str);
@@ -829,7 +829,7 @@ refresh_dialog(t_battmon_dialog *dialog)
     t_battmon *battmon = dialog->battmon;
 
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(dialog->sb_low_percentage), battmon->options.low_percentage);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(dialog->sb_hidden_indicator_full_amt), battmon->options.hidden_indicator_full_amt);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(dialog->sb_user_set_full_amount), battmon->options.user_set_full_amount);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(dialog->sb_critical_percentage), battmon->options.critical_percentage);
     gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(dialog->ac_color_button), &battmon->options.colorA);
     gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(dialog->high_color_button), &battmon->options.colorH);
@@ -952,11 +952,11 @@ set_tooltip_time(GtkToggleButton *tb, t_battmon_dialog *dialog)
 }
 
 static void
-set_hidden_indicator_full_amt(GtkSpinButton *sb, t_battmon_dialog *dialog)
+set_user_set_full_amount(GtkSpinButton *sb, t_battmon_dialog *dialog)
 {
     t_battmon *battmon = dialog->battmon;
 
-    battmon->options.hidden_indicator_full_amt = gtk_spin_button_get_value_as_int(sb);
+    battmon->options.user_set_full_amount = gtk_spin_button_get_value_as_int(sb);
     update_apm_status(dialog->battmon);
 }
 
@@ -1269,8 +1269,8 @@ battmon_create_options(XfcePanelPlugin *plugin, t_battmon *battmon)
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
     gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
 
-    dialog->sb_hidden_indicator_full_amt = gtk_spin_button_new_with_range(1, 100, 1);
-    gtk_box_pack_start(GTK_BOX(hbox), dialog->sb_hidden_indicator_full_amt, FALSE, FALSE, 0);
+    dialog->sb_user_set_full_amount = gtk_spin_button_new_with_range(1, 100, 1);
+    gtk_box_pack_start(GTK_BOX(hbox), dialog->sb_user_set_full_amount, FALSE, FALSE, 0);
 
 
     /* Low battery action settings */
@@ -1423,7 +1423,7 @@ battmon_create_options(XfcePanelPlugin *plugin, t_battmon *battmon)
     g_signal_connect(dialog->cb_disp_label, "toggled", G_CALLBACK(set_disp_label), dialog);
     g_signal_connect(dialog->cb_disp_icon, "toggled", G_CALLBACK(set_disp_icon), dialog);
 
-    g_signal_connect(dialog->sb_hidden_indicator_full_amt, "value-changed", G_CALLBACK(set_hidden_indicator_full_amt), dialog);
+    g_signal_connect(dialog->sb_user_set_full_amount, "value-changed", G_CALLBACK(set_user_set_full_amount), dialog);
     g_signal_connect(dialog->sb_low_percentage, "value-changed", G_CALLBACK(set_low_percentage), dialog);
     g_signal_connect(dialog->sb_critical_percentage, "value-changed", G_CALLBACK(set_critical_percentage), dialog);
     g_signal_connect(dialog->co_action_low, "changed", G_CALLBACK(set_action_low), dialog);
